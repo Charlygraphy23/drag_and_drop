@@ -30,8 +30,9 @@ const handleDragEnd = (event) => {
 
 const handleDragOver = (event) => {
     event.preventDefault()
-    console.log("Touch")
     if(!event?.target.className.includes("dropzone")) return;
+
+    console.log("dragging")
     hovering(destination)
 }
 
@@ -49,7 +50,7 @@ const handleDrop = (event) => {
     droppableImagesContainer.push(dragging)
     dragging.addToParent(destination)
     console.log(droppableImagesContainer)
-    endHover()
+    endHover(destination)
 }
 
 const handleTouchMove = (event) => {
