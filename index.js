@@ -6,8 +6,11 @@ const images = [
     "https://w7.pngwing.com/pngs/291/127/png-transparent-dinosaur-cartoon-illustration-cartoon-small-dinosaur-cartoon-character-mammal-cat-like-mammal-thumbnail.png"
 ]
 let draggableImagesContainer = [];
-const droppableImagesContainer = [];
+let droppableImagesContainer = [];
 let dragging = null
+let order = "";
+let targetElement = null
+let triggerInset = ""
 
 const source = ELEMENT.source
 const destination = ELEMENT.destination
@@ -18,21 +21,82 @@ const hovering = (element) => {
 const endHover = (element) => {
     element.classList.remove("hover")
 }
+const clearState = () => {
+    clearPlaceholders()
+    dragging = null
+    order = ""
+    targetElement = null
+}
+const clearPlaceholders = () => {
+    const placeholders = document.querySelectorAll(".placeholder")
+    placeholders.forEach((placeholder) => {
+        placeholder.remove()
+    })
+}
+const createPlaceholder = (width, height) => {
+    clearPlaceholders()
+    const div = document.createElement("div")
+    div.style.width = `${width}px`
+    div.style.height = `${height}px`
+    div.className = "placeholder"
+    return div
+}
+const handleOrderedInsert = () => {
+    const findPossibleIndex = droppableImagesContainer.findIndex((data) => data.index === +targetElement?.dataset?.index)
+
+    if (order === "before") {
+        droppableImagesContainer.splice(findPossibleIndex, 0, dragging)
+        targetElement.before(dragging.img)
+    }
+    else {
+        droppableImagesContainer.splice(findPossibleIndex, 0, dragging)
+        targetElement.after(dragging.img)
+    }
+}
+
+
+const handleDragEnd = (event) => {
+    event.preventDefault()
+    clearState()
+
+}
 
 const handleDragStart = (event) => {
     dragging = draggableImagesContainer.find(data => data.img.dataset.index === event.target.dataset.index)
 }
 
-const handleDragEnd = (event) => {
-    event.preventDefault()
-    dragging = null
+const handleImageInsertOrder = (event, target) => {
+    const box = target.getBoundingClientRect();
+    const x = event.clientX
+    const midOfBox = (box.right - (box.width / 2))
+    const isLeftSide = midOfBox >= x
+
+    if (triggerInset === isLeftSide) return;
+    triggerInset = isLeftSide
+
+    const placeholder = createPlaceholder(box.width, box.height)
+
+    if (isLeftSide) {
+        target.before(placeholder)
+        order = "before"
+    }
+    else {
+        target.after(placeholder)
+        order = "after"
+    }
+    targetElement = target
 }
 
 const handleDragOver = (event) => {
     event.preventDefault()
-    if(!event?.target.className.includes("dropzone")) return;
+    const target = event.target;
 
-    console.log("dragging")
+    if (target.nodeName === "IMG") {
+        handleImageInsertOrder(event, target)
+    }
+
+    if (!target.className.includes("dropzone")) return;
+
     hovering(destination)
 }
 
@@ -42,20 +106,25 @@ const handleDragLeave = (event) => {
 }
 
 const handleDrop = (event) => {
-    event.preventDefault()  
+    event.preventDefault()
+    if (!targetElement && !order) {
+        dragging.addToParent(destination)
+        droppableImagesContainer.push(dragging)
+    }
 
-    const target = event?.target
-    if(!target?.className?.includes("dropzone")) return;
-
-    droppableImagesContainer.push(dragging)
-    dragging.addToParent(destination)
-    console.log(droppableImagesContainer)
+    else handleOrderedInsert()
     endHover(destination)
+    clearPlaceholders()
 }
 
 const handleTouchMove = (event) => {
     event.preventDefault();
     const touch = event.changedTouches[0]
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    if (target.nodeName === "IMG" && !target.className.includes("draggable") && !target.parentElement.className.includes("draggable")) {
+        handleImageInsertOrder(touch , target)
+    }
 
     const isTouchOverDropZone = isOverDropZone(touch)
     if (isTouchOverDropZone) {
@@ -66,12 +135,15 @@ const handleTouchMove = (event) => {
 
 
 const handleTouchEnd = (event) => {
-    console.log("Touch End")
     const touch = event.changedTouches[0]
     const isTouchOverDropZone = isOverDropZone(touch)
     if (isTouchOverDropZone) {
-        droppableImagesContainer.push(dragging)
-        dragging.addToParent(destination)
+        if (!targetElement && !order) {
+            dragging.addToParent(destination)
+            droppableImagesContainer.push(dragging)
+        }
+
+        else handleOrderedInsert()
         endHover(ELEMENT.destination)
     }
 
@@ -79,8 +151,8 @@ const handleTouchEnd = (event) => {
 }
 
 const loadImages = (_images) => {
-    draggableImagesContainer = _images.map((item , index) => {
-        const imageElement = new DragElement(item , index)
+    draggableImagesContainer = _images.map((item, index) => {
+        const imageElement = new DragElement(item, index)
         imageElement.addToParent(source)
         return imageElement
     })
@@ -93,9 +165,9 @@ const renderView = () => {
 
 source.addEventListener("dragstart", handleDragStart)
 source.addEventListener("dragend", handleDragEnd)
-destination.addEventListener("dragover" ,handleDragOver)
-destination.addEventListener("dragleave" , handleDragLeave)
-destination.addEventListener("drop" ,handleDrop)
+destination.addEventListener("dragover", handleDragOver)
+destination.addEventListener("dragleave", handleDragLeave)
+destination.addEventListener("drop", handleDrop)
 source.addEventListener("dragstart", handleDragStart)
 source.addEventListener("touchstart", handleDragStart)
 source.addEventListener("touchmove", handleTouchMove)
